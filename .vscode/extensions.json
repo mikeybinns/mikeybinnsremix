@@ -1,0 +1,12 @@
+{
+	"recommendations": [
+		"deque-systems.vscode-axe-linter",
+		"streetsidesoftware.code-spell-checker",
+		"editorconfig.editorconfig",
+		"dbaeumer.vscode-eslint",
+		"esbenp.prettier-vscode",
+		"prisma.prisma",
+		"stylelint.vscode-stylelint",
+		"gruntfuggly.todo-tree"
+	]
+}

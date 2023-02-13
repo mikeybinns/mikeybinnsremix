@@ -1,0 +1,27 @@
+---
+title: Example post
+published: 2023-01-22
+description: This is an example blog post I'm using to build my MDX implementation.
+---
+
+# Wahoo
+
+import Demo from "./demo";
+
+Here's a **neat** demo:
+
+<Demo />
+
+```ts
+// This is a code block with syntax highlighting
+import { useState } from "@remix-run/react";
+export const variable = "An example";
+
+export type PropsType = {
+	aProp: string;
+};
+export function ComponentExample(props: PropsType) {
+	const [state, setState] = useState();
+	return <>Test {state}</>;
+}
+```

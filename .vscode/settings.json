@@ -1,0 +1,23 @@
+{
+	// Make VS Code format files when you save them automatically
+	"editor.formatOnSave": true,
+
+	// Set default code formatters
+	"editor.defaultFormatter": "esbenp.prettier-vscode",
+
+	// Automatically detect file indentation.
+	"editor.detectIndentation": true,
+
+	// Bracket colourisation
+	"editor.bracketPairColorization.enabled": true,
+
+	// Enable emmet expansion
+	"emmet.triggerExpansionOnTab": true,
+
+	// Add Todo tree custom tags
+	"todo-tree.general.tags": ["TODO", "NOTE", "@todo"],
+	"todo-tree.regex.regex": "(//|#|<!--|;|\\*|/\\*|^|^[ \\t]*(-|\\d+.))\\s*($TAGS)",
+
+	// Spellcheck
+	"cSpell.words": ["atomicsmash", "meridiem", "Pipeable", "unslash"]
+}
