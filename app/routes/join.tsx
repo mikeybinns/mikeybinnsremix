@@ -1,4 +1,5 @@
-import type { ActionArgs, LoaderArgs, MetaFunction } from "@remix-run/node";
+import type { ActionArgs, LoaderArgs, V2_MetaFunction } from "@remix-run/node";
+import type { ZXCVBNResult } from "zxcvbn";
 import type { ErrorsFromValues } from "~/models/forms";
 import type { OneOfThemes } from "~/models/teams";
 import {
@@ -15,13 +16,14 @@ import {
 	useTransition as useNavigation,
 } from "@remix-run/react";
 import { useEffect, useRef, useState } from "react";
+import zxcvbn from "zxcvbn";
 import { Button } from "~/components/Button";
+import { FormInputGroupWrapper } from "~/components/FormInputGroupWrapper";
+import { FormInputWrapper } from "~/components/FormInputWrapper";
 import { Hyperlink } from "~/components/Hyperlink";
+import { Icon } from "~/components/Icon";
 import { CloudinaryImage, GravatarOrDefaultImage } from "~/components/Image";
-import { PasswordInput } from "~/components/inputs/Password";
-import { RadioGroup } from "~/components/inputs/RadioGroup";
-import { SelectInput } from "~/components/inputs/Select";
-import { Input } from "~/components/inputs/SingleLineInput";
+import { VisuallyHidden } from "~/components/VisuallyHidden";
 import { DEFAULT_READING_SPEED } from "~/models/reading";
 import {
 	isValidTeamTheme,
@@ -44,11 +46,11 @@ type JoinFormValues = {
 	teamNumber: 0 | 1 | 2;
 };
 
-export const meta: MetaFunction = () => {
-	return {
-		title: "Sign Up",
-	};
-};
+export const meta: V2_MetaFunction = () => [
+	{
+		title: "Sign up",
+	},
+];
 
 export async function action({ request }: ActionArgs) {
 	let formData = await request.clone().formData();
@@ -82,7 +84,7 @@ export async function action({ request }: ActionArgs) {
 
 		formData = await unstable_parseMultipartFormData(request, uploadHandler);
 		const imageURL = formData.get("imageURL")?.toString();
-		if (!imageURL) {
+		if (imageURL === undefined) {
 			const errors: ErrorsFromValues<JoinFormValues> = {
 				exist: true,
 				imageURL: "Failed to upload your custom image.",
@@ -121,7 +123,7 @@ export async function loader({ request }: LoaderArgs) {
 	const searchParams = new URL(request.url).searchParams;
 	const userId = await getUserId(request);
 
-	if (userId) {
+	if (userId !== undefined) {
 		return redirect(safeRedirect(searchParams.get("redirectTo"), "/"));
 	}
 
@@ -146,117 +148,258 @@ export default function Component() {
 		useState<OneOfThemes>("colours");
 
 	useEffect(() => {
-		if (actionData?.errors?.fullName) {
+		if (actionData?.errors?.fullName !== undefined) {
 			nameRef.current?.focus();
-		} else if (actionData?.errors?.email) {
+		} else if (actionData?.errors?.email !== undefined) {
 			emailRef.current?.focus();
-		} else if (actionData?.errors?.password) {
+		} else if (actionData?.errors?.password !== undefined) {
 			passwordRef.current?.focus();
 		}
 	}, [actionData]);
 
+	const [passwordValue, setPasswordValue] = useState("");
+	const [shouldShowPassword, setShouldShowPassword] = useState(false);
+	const [ZXCVBNResult, setZXCVBNResult] = useState<ZXCVBNResult>({
+		calc_time: 2,
+		crack_times_display: {
+			offline_fast_hashing_1e10_per_second: "less than a second",
+			offline_slow_hashing_1e4_per_second: "less than a second",
+			online_no_throttling_10_per_second: "less than a second",
+			online_throttling_100_per_hour: "36 seconds",
+		},
+		crack_times_seconds: {
+			offline_fast_hashing_1e10_per_second: 1e-10,
+			offline_slow_hashing_1e4_per_second: 0.0001,
+			online_no_throttling_10_per_second: 0.1,
+			online_throttling_100_per_hour: 36,
+		},
+		feedback: {
+			warning: "",
+			suggestions: [
+				"Use a few words, avoid common phrases",
+				"No need for symbols, digits, or uppercase letters",
+			],
+		},
+		guesses: 1,
+		guesses_log10: 0,
+		score: 0,
+		sequence: [],
+	});
+	useEffect(() => {
+		setZXCVBNResult(zxcvbn(passwordValue));
+	}, [passwordValue]);
+
 	return (
 		<main>
 			<Form method="post">
-				<Input
-					ref={nameRef}
-					name={"fullName"}
-					id={"full-name"}
+				<FormInputWrapper
 					label={"Full name"}
-					isInvalid={() => false}
-					required={true}
 					error={actionData?.errors?.fullName}
-					type="text"
-					autoComplete="name"
+					isRequired={true}
+					input={({ uniqueId, hasError, isRequired }) => {
+						return (
+							<input
+								ref={nameRef}
+								type="text"
+								name="fullName"
+								id={uniqueId}
+								aria-invalid={hasError}
+								required={isRequired}
+								autoComplete="name"
+							/>
+						);
+					}}
 				/>
-				<Input
-					ref={emailRef}
-					name={"email"}
-					id={"email"}
+				<FormInputWrapper
 					label={"Email address"}
-					isInvalid={() => false}
-					required={true}
 					error={actionData?.errors?.email}
-					type="email"
-					autoComplete="email"
+					isRequired={true}
+					input={({ uniqueId, hasError, isRequired }) => {
+						return (
+							<input
+								ref={emailRef}
+								type="email"
+								name="email"
+								id={uniqueId}
+								aria-invalid={hasError}
+								required={isRequired}
+								autoComplete="email"
+							/>
+						);
+					}}
 				/>
-				<PasswordInput
-					ref={passwordRef}
-					name={"password"}
-					id={"password"}
+				<FormInputWrapper
 					label={"Password"}
-					isInvalid={() => false}
-					new_password={true}
-					required={true}
-					error={actionData?.errors?.password}
+					error={
+						<div className="password_strength_information hide-if-no-js">
+							<meter
+								min={-1}
+								max={4}
+								low={2}
+								high={3}
+								value={passwordValue === "" ? -1 : ZXCVBNResult.score}
+								optimum={3.99}
+							/>
+							{passwordValue.length > 0 && ZXCVBNResult.score <= 2 ? (
+								<div>
+									{ZXCVBNResult.feedback.warning !== "" ? (
+										<>
+											<div>
+												<strong>Warning</strong>
+												<p>{ZXCVBNResult.feedback.warning}</p>
+											</div>
+										</>
+									) : null}
+									<div>
+										<strong>Password is weak</strong>
+										<ul>
+											{ZXCVBNResult.feedback.suggestions.map((suggestion) => {
+												return <li key={suggestion}>{suggestion}</li>;
+											})}
+										</ul>
+									</div>
+								</div>
+							) : null}
+						</div>
+					}
+					trailingIcons={
+						shouldShowPassword ? (
+							<Button
+								onClick={() => setShouldShowPassword(!shouldShowPassword)}
+								className="hide-if-no-js"
+							>
+								<Icon iconName="eye-closed" />
+								<VisuallyHidden>Hide password</VisuallyHidden>
+							</Button>
+						) : (
+							<Button
+								onClick={() => setShouldShowPassword(!shouldShowPassword)}
+								className="hide-if-no-js"
+							>
+								<Icon iconName="eye-open" />
+								<VisuallyHidden>Show password</VisuallyHidden>
+							</Button>
+						)
+					}
+					input={({ uniqueId, hasError, isRequired }) => {
+						return (
+							<input
+								ref={passwordRef}
+								name={"password"}
+								type={shouldShowPassword ? "text" : "password"}
+								onChange={(event) => setPasswordValue(event.target.value)}
+								id={uniqueId}
+								aria-invalid={hasError}
+								required={isRequired}
+								autoComplete={"new-password"}
+							/>
+						);
+					}}
 				/>
-
-				<RadioGroup
-					label={"Profile image type"}
-					name={"imageType"}
-					defaultValue={"default"}
-					inputs={[
-						{
-							id: "default-image-radio",
-							labelContent: <GravatarOrDefaultImage />,
-							value: "default",
-						},
-						{
-							id: "custom-image-radio",
-							labelContent: <CloudinaryImage name={"custom-image"} />,
-							value: "custom",
-						},
-					]}
-					externalState={[imageTypeSelected, setImageTypeSelected]}
-				/>
+				<FormInputGroupWrapper label={"Profile image type"}>
+					<label>
+						<input
+							type="radio"
+							name={"imageType"}
+							id={"default-image-radio"}
+							value="default"
+							checked
+							onChange={() => setImageTypeSelected("default")}
+						/>
+						<GravatarOrDefaultImage />
+					</label>
+					<label>
+						<input
+							type="radio"
+							name={"imageType"}
+							id={"custom-image-radio"}
+							value="custom"
+							onChange={() => setImageTypeSelected("custom")}
+						/>
+						<CloudinaryImage name={"custom-image"} />
+					</label>
+				</FormInputGroupWrapper>
 
 				{imageTypeSelected === "custom" ? (
-					<Input
-						name={"imageFile"}
-						id={"imageFile"}
+					<FormInputWrapper
 						label={"Custom image upload"}
-						isInvalid={() => false}
-						required={true}
-						type="file"
-						accept="image/*"
 						error={actionData?.errors?.imageURL}
+						isRequired={true}
+						input={({ uniqueId, hasError, isRequired }) => {
+							return (
+								<input
+									type="file"
+									accept="image/*"
+									name="imageFile"
+									id={uniqueId}
+									aria-invalid={hasError}
+									required={isRequired}
+								/>
+							);
+						}}
 					/>
 				) : null}
 
-				<SelectInput
-					name={"teamTheme"}
+				<FormInputWrapper
 					label={"Team theme"}
-					options={allTeamThemeOptions}
-					defaultValue={defaultTeamTheme}
-					onChange={(event) => {
-						if (isValidTeamTheme(event.target.value)) {
-							setSelectedTeamTheme(event.target.value);
-						}
+					input={({ uniqueId, hasError }) => {
+						return (
+							<select
+								id={uniqueId}
+								aria-invalid={hasError}
+								name={"teamTheme"}
+								onChange={(event) => {
+									if (isValidTeamTheme(event.target.value)) {
+										setSelectedTeamTheme(event.target.value);
+									}
+								}}
+							>
+								{allTeamThemeOptions.map(({ value, label }) => (
+									<option
+										key={value}
+										value={value}
+										selected={defaultTeamTheme === value}
+									>
+										{label}
+									</option>
+								))}
+							</select>
+						);
 					}}
 				/>
 
-				<RadioGroup
-					label={"Pick a team"}
-					name={"teamNumber"}
-					defaultValue={"0"}
-					inputs={[
-						{
-							id: "team-0",
-							labelContent: teamNamesByTheme[selectedTeamTheme][0],
-							value: "0",
-						},
-						{
-							id: "team-1",
-							labelContent: teamNamesByTheme[selectedTeamTheme][1],
-							value: "1",
-						},
-						{
-							id: "team-2",
-							labelContent: teamNamesByTheme[selectedTeamTheme][2],
-							value: "2",
-						},
-					]}
-				/>
+				<FormInputGroupWrapper label={"Pick a team"}>
+					<label>
+						<input
+							type="radio"
+							name={"teamNumber"}
+							id={"team-0"}
+							value="0"
+							checked
+						/>
+						{teamNamesByTheme[selectedTeamTheme][0]}
+					</label>
+					<label>
+						<input
+							type="radio"
+							name={"teamNumber"}
+							id={"team-1"}
+							value="1"
+							checked
+						/>
+						{teamNamesByTheme[selectedTeamTheme][1]}
+					</label>
+					<label>
+						<input
+							type="radio"
+							name={"teamNumber"}
+							id={"team-2"}
+							value="2"
+							checked
+						/>
+						{teamNamesByTheme[selectedTeamTheme][2]}
+					</label>
+				</FormInputGroupWrapper>
 
 				<input type="hidden" name="redirectTo" value={redirectTo} />
 				<Button
